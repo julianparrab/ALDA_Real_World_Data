@@ -1,148 +1,90 @@
 import unittest
 import pandas as pd
-import numpy as np
-import tempfile
-import os
-import re
-from unittest.mock import patch
 from io import StringIO
-from src.parser import load_dataset, _initial_cleaning, _validate_data, _process_columns
+from src.parser import load_dataset, initial_cleaning, validate_data
 
-class TestVehicleDataset(unittest.TestCase):
+
+class TestHospitalDataProcessing(unittest.TestCase):
     def setUp(self):
-        """Create a sample DataFrame for testing"""
-        self.sample_data = {
-            'id': [1, 2, 3, 4],
-            'plate_number': ['ABC123', 'XYZ789', 'INVALID', 'DEF456'],
-            'brand': ['Toyota', 'Ford', 'BMW', 'Chevrolet'],
-            'model': ['Corolla', 'F-150', 'X5', 'Spark'],
-            'year': [2015, 2018, 2020, 2016],
-            'color': ['Red', 'Blue', 'Black', 'White'],
-            'fuel_Type': ['Gasoline', 'Diesel', 'Invalid', 'Electric'],
-            'transmission_type': ['Automatic', 'Manual', 'Automatic', 'Invalid'],
-            'odometer_reading': [45000.5, 78000.0, 12000.0, 65000.0],
-            'owner_id': ['ID100', 'ID200', 'ID300', None],
-            'vehicle_status': ['IN_USE', 'SELLING', 'MAINTENANCE', 'INVALID'],
-            'engine_size': ['1.8L', '2.5L', '3.0L', '1.4L'],
-            'registration_date': ['2020-01-15', '2019-05-20', '2021-02-10', '2018-11-30']
-        }
-        
-        # Create a temporary CSV file for testing
-        self.temp_file = tempfile.NamedTemporaryFile(delete=False, suffix='.csv')
-        pd.DataFrame(self.sample_data).to_csv(self.temp_file.name, index=False)
-        self.temp_file.close()
-        
-    def tearDown(self):
-        """Clean up temporary files"""
-        os.unlink(self.temp_file.name)
-    
-    def test_load_dataset_success(self):
-        """Test successful loading of dataset"""
-        with patch('sys.stdout', new=StringIO()) as fake_out:
-            df = load_dataset(self.temp_file.name)
-            
-            # Basic checks
-            self.assertIsInstance(df, pd.DataFrame)
-            self.assertFalse(df.empty)
-            self.assertIn('DataFrame loaded successfully', fake_out.getvalue())
-            
-            # Check column normalization
-            self.assertIn('fuel_type', df.columns)  # Should be lowercase
-            
-    def test_empty_dataframe(self):
-        """Test handling of empty CSV file"""
-        empty_file = tempfile.NamedTemporaryFile(delete=False, suffix='.csv')
-        empty_file.close()
-        
-        with patch('sys.stdout', new=StringIO()) as fake_out:
-            df = load_dataset(empty_file.name)
-            self.assertTrue(df.empty)
-            self.assertIn('The DataFrame is empty', fake_out.getvalue())
-        os.unlink(empty_file.name)
-    
-    def test_initial_cleaning(self):
-        """Test the _initial_cleaning function"""
-        test_df = pd.DataFrame({' ID ': [1], '  Value  ': [10]})
-        cleaned_df = _initial_cleaning(test_df)
-        
-        self.assertEqual(list(cleaned_df.columns), ['id', 'value'])
-        self.assertEqual(len(cleaned_df), 1)
-    
-    def test_validate_data(self):
-        """Test data validation functions"""
-        test_df = pd.DataFrame({
-            'plate_number': ['ABC123', 'INVALID', 'XYZ789'],
-            'fuel_type': ['Gasoline', 'Invalid', 'Diesel'],
-            'transmission_type': ['Automatic', 'Manual', 'Invalid'],
-            'vehicle_status': ['IN_USE', 'SELLING', 'INVALID'],
-            'owner_id': ['ID1', 'ID2', None]
-        })
-        
-        pattern = re.compile(r'^[A-Z]{3}[0-9]{3}$')
-        validated_df = _validate_data(
-            test_df, 
-            pattern, 
-            valid_fuels={'Gasoline', 'Diesel'},
-            valid_status={'IN_USE', 'SELLING'},
-            valid_transmission={'Automatic', 'Manual'}
+        self.csv_data = StringIO(
+            """name,age,gender,blood_type,medical_condition,date_of_admission,doctor,hospital,insurance_provider,billing_amount,room_number,admission_type,discharge_date,medication,test_results
+        Dr. John Doe,35,male,A+,flu,2023-01-01,Dr. Jane Smith,"General Hospital",Insurance Co,25000.50,101,Emergency,2023-01-10,Paracetamol,Positive
+        Mrs. Alice Johnson,28,FEMALE,o-,diabetes,2023-02-15,Dr. House,"Clinic, Ltd",Health Corp,15000,102,Elective,2023-02-25,Insulin,Negative
+        """
         )
-        
-        # Should only keep first row
-        self.assertEqual(len(validated_df), 1)
-        self.assertEqual(validated_df.iloc[0]['plate_number'], 'ABC123')
-    
-    def test_process_columns(self):
-        """Test column processing functions"""
-        test_df = pd.DataFrame({
-            'engine_size': ['1.8L', '2.5L', '3.0L'],
-            'year': ['2015', '2018', '2020'],
-            'odometer_reading': ['45000.5', '78000.0', '12000.0'],
-            'registration_date': ['2020-01-15', '2019-05-20', '2021-02-10']
-        })
-        
-        processed_df = _process_columns(test_df)
-        
-        # Check engine size conversion
-        self.assertTrue(pd.api.types.is_float_dtype(processed_df['engine_size']))
-        self.assertEqual(processed_df['engine_size'].iloc[0], 1.8)
-        
-        # Check numeric conversion
-        self.assertTrue(pd.api.types.is_integer_dtype(processed_df['year']))
-        
-        # Check date conversion
-        self.assertTrue(pd.api.types.is_datetime64_any_dtype(processed_df['registration_date']))
-    
-    def test_plate_number_validation(self):
-        """Test plate number validation"""
-        with patch('sys.stdout', new=StringIO()) as fake_out:
-            df = load_dataset(self.temp_file.name)
-            # Should keep ABC123, XYZ789, DEF456 and remove INVALID
-            self.assertEqual(len(df), 3)
-            self.assertNotIn('INVALID', df['plate_number'].values)
-            self.assertIn('Removing 1 records with invalid plates', fake_out.getvalue())
-    
-    def test_fuel_type_validation(self):
-        """Test fuel type validation"""
-        df = load_dataset(self.temp_file.name)
-        valid_fuels = {'Gasoline', 'Diesel', 'Electric', 'Hybrid'}
-        self.assertTrue(all(fuel in valid_fuels for fuel in df['fuel_type'].unique()))
-    
-    def test_transmission_validation(self):
-        """Test transmission type validation"""
-        df = load_dataset(self.temp_file.name)
-        valid_transmissions = {'Automatic', 'Manual'}
-        self.assertTrue(all(trans in valid_transmissions for trans in df['transmission_type'].unique()))
-    
-    def test_owner_id_validation(self):
-        """Test owner ID validation (should remove nulls)"""
-        df = load_dataset(self.temp_file.name)
-        self.assertFalse(df['owner_id'].isnull().any())
-    
-    def test_vehicle_status_validation(self):
-        """Test vehicle status validation"""
-        df = load_dataset(self.temp_file.name)
-        valid_status = {'IN_USE', 'SELLING', 'MAINTENANCE'}
-        self.assertTrue(all(status in valid_status for status in df['vehicle_status'].unique()))
+        # Asegurar normalización similar a load_dataset
+        df = pd.read_csv(
+            self.csv_data,
+            dtype={
+                "name": "category",
+                "age": "int64",
+                "gender": "category",
+                "blood_type": "category",
+                "medical_condition": "string",
+                "date_of_admission": "category",
+                "doctor": "string",
+                "hospital": "string",
+                "insurance_provider": "string",
+                "billing_amount": "float64",
+                "room_number": "int64",
+                "admission_type": "category",
+                "discharge_date": "category",
+                "medication": "string",
+                "test_results": "category",
+            },
+        )
+        df.columns = [col.strip().lower().replace(" ", "_") for col in df.columns]
 
-if __name__ == '__main__':
+        self.cleaned_df = initial_cleaning(df)
+        self.validated_df = validate_data(self.cleaned_df)
+
+    def test_initial_cleaning_standardizes_names(self):
+        cleaned_names = list(self.cleaned_df["name"].values)
+        self.assertTrue(any("John Doe" in name for name in cleaned_names))
+        self.assertTrue(any("Jane Smith" in doc for doc in self.cleaned_df["doctor"].values))
+
+    def test_initial_cleaning_gender_title_case(self):
+        self.assertTrue(all(g in ["Male", "Female"] for g in self.cleaned_df["gender"]))
+
+    def test_initial_cleaning_blood_type_upper(self):
+        self.assertTrue(all(bt in ["A+", "O-"] for bt in self.cleaned_df["blood_type"]))
+
+    def test_date_conversion(self):
+        self.assertTrue(pd.api.types.is_datetime64_any_dtype(self.cleaned_df["date_of_admission"]))
+        self.assertTrue(pd.api.types.is_datetime64_any_dtype(self.cleaned_df["discharge_date"]))
+
+    def test_length_of_stay_calculated(self):
+        self.assertIn("length_stay", self.cleaned_df.columns)
+        self.assertTrue((self.cleaned_df["length_stay"] == 9).any())
+
+    def test_age_group_created(self):
+        self.assertIn("age_group", self.cleaned_df.columns)
+        self.assertTrue(self.cleaned_df["age_group"].notnull().all())
+
+    def test_validate_data_filters_out_of_range(self):
+        invalid_data = self.cleaned_df.copy()
+        invalid_data.loc[0, "age"] = 150
+        result = validate_data(invalid_data)
+        self.assertNotIn(150, result["age"].values)
+
+    def test_billing_amount_filter(self):
+        invalid_data = self.cleaned_df.copy()
+        invalid_data.loc[0, "billing_amount"] = -1000
+        result = validate_data(invalid_data)
+        self.assertTrue((result["billing_amount"] >= 0).all())
+
+    def test_gender_validation(self):
+        invalid_data = self.cleaned_df.copy()
+        invalid_data.loc[0, "gender"] = "Unknown"
+        result = validate_data(invalid_data)
+        self.assertNotIn("Unknown", result["gender"].values)
+
+    def test_blood_type_validation(self):
+        invalid_data = self.cleaned_df.copy()
+        invalid_data.loc[0, "blood_type"] = "X+"
+        result = validate_data(invalid_data)
+        self.assertNotIn("X+", result["blood_type"].values)
+
+
+if __name__ == "__main__":
     unittest.main()

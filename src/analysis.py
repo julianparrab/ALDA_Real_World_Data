@@ -6,6 +6,7 @@ import os
 # Ensure plot directory exists
 os.makedirs("plots", exist_ok=True)
 
+
 def execute_plots(df: pd.DataFrame):
     # General category distributions
     category_columns = ["age_group", "gender", "blood_type", "medical_condition"]
@@ -21,17 +22,10 @@ def execute_plots(df: pd.DataFrame):
     plot_single_relationship(df, "billing_category", "age_group")
     plot_single_relationship(df, "billing_category", "gender")
     plot_single_relationship(df, "billing_category", "medical_condition")
-    plot_single_relationship(df, "billing_category","length_stay_group")
-    
-    
-    #plot_single_relationship(df, "medical_condition", "gender")
-    #plot_single_relationship(df, "medical_condition", "hospital")
-    #plot_single_relationship(df, "medical_condition", "billing_category")
-    #plot_double_relationships(df, "medical_condition", ["gender", "billing_category"])
-    #plot_field_relationships(df, "insurance_provider", ["gender", "age_group", "medical_condition", "billing_category"])
-    #plot_field_relationships(df, "hospital", ["age_group", "insurance_provider", "length_stay", "billing_category"])
+    plot_single_relationship(df, "billing_category", "length_stay_group")
 
     plot_single_relationship(df, "hospital", "billing_category")
+
 
 def plot_column_distribution(df: pd.DataFrame, column: str):
     plt.figure(figsize=(10, 6))
@@ -41,6 +35,7 @@ def plot_column_distribution(df: pd.DataFrame, column: str):
     plt.ylabel("Frequency")
     plt.savefig(f"plots/{column}_distribution.png")
     plt.close()
+
 
 def plot_categories(df: pd.DataFrame, columns: list, nrows: int, ncols: int, filename: str):
     fig, axes = plt.subplots(nrows=nrows, ncols=ncols, figsize=(18, 12))
@@ -58,6 +53,7 @@ def plot_categories(df: pd.DataFrame, columns: list, nrows: int, ncols: int, fil
     plt.savefig(f"plots/{filename}")
     plt.close()
 
+
 def plot_field_relationships(df: pd.DataFrame, base_field: str, compare_fields: list):
     fig, axes = plt.subplots(2, 2, figsize=(16, 10), constrained_layout=True)
     fig.suptitle(f"{base_field.replace('_', ' ').title()} Relationships", fontsize=16)
@@ -66,12 +62,13 @@ def plot_field_relationships(df: pd.DataFrame, base_field: str, compare_fields: 
         row, col = divmod(i, 2)
         sns.countplot(data=df, x=base_field, hue=field, ax=axes[row, col])
         axes[row, col].set_title(f"{base_field.replace('_', ' ').title()} vs {field.replace('_', ' ').title()}")
-        axes[row, col].set_xlabel(base_field.replace('_', ' ').title())
+        axes[row, col].set_xlabel(base_field.replace("_", " ").title())
         axes[row, col].set_ylabel("Count")
-        axes[row, col].tick_params(axis='x', rotation=45)
+        axes[row, col].tick_params(axis="x", rotation=45)
 
     plt.savefig(f"plots/{base_field}_relationships.png")
     plt.close()
+
 
 def plot_single_relationship(df: pd.DataFrame, field: str, hue: str):
     plt.figure(figsize=(10, 6))
@@ -81,4 +78,3 @@ def plot_single_relationship(df: pd.DataFrame, field: str, hue: str):
     plt.tight_layout()
     plt.savefig(f"plots/{field}_vs_{hue}.png")
     plt.clf()
-
